@@ -1,0 +1,5 @@
+{
+  "plugins": ["./tools/assemblyscript-prettier-plugin.js"],
+  "singleQuote": false,
+  "tabWidth": 2
+}

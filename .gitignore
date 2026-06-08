@@ -1,0 +1,18 @@
+node_modules/
+
+# Generated test output
+.as-test/
+
+# Generated benchmark and wasm output
+build/
+
+# Generated charts output (published to the `docs` branch; see scripts/publish-charts.sh)
+/charts/
+!scripts/charts/
+
+# Local environment files
+.env
+.env.*
+
+# OS/editor noise
+.DS_Store

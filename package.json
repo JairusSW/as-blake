@@ -1,0 +1,53 @@
+{
+  "name": "blake-as",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Portable, SIMD-accelerated BLAKE3 for AssemblyScript - SWAR and degree-4 SIMD, dispatched at compile time.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Jairus <me@jairus.dev>",
+  "keywords": [
+    "blake3",
+    "blake",
+    "hash",
+    "cryptography",
+    "simd",
+    "assemblyscript",
+    "webassembly",
+    "wasm"
+  ],
+  "scripts": {
+    "test": "ast test",
+    "format": "prettier -w .",
+    "format:check": "prettier -c .",
+    "lint": "eslint . --no-warn-ignored",
+    "lint:fix": "eslint . --fix --no-warn-ignored",
+    "verify": "asc assembly/blake3/index.ts -o build/blake3-verify.wasm -O3 --noAssert --uncheckedBehavior always --runtime stub --exportRuntime --disable simd && asc assembly/blake3/index_simd.ts -o build/blake3-simd-verify.wasm -O3 --noAssert --uncheckedBehavior always --enable simd --runtime stub --exportRuntime && node scripts/verify-blake3.mjs && node scripts/verify-blake3-simd.mjs",
+    "bench": "bash ./scripts/run-bench.sh",
+    "bench:list": "bash ./scripts/run-bench.sh --list",
+    "bench:summary": "node ./scripts/bench-summary.mjs",
+    "charts": "npm run charts:build && npm run charts:serve",
+    "charts:build": "bash ./scripts/build-charts.sh",
+    "charts:publish": "bash ./scripts/publish-charts.sh",
+    "charts:list": "bash ./scripts/build-charts.sh --list",
+    "charts:serve": "npx --yes serve@latest ./charts",
+    "report": "npm run bench && npm run charts:build",
+    "clean": "rm -rf build charts .as-test",
+    "clean:bench": "rm -rf build/logs charts"
+  },
+  "devDependencies": {
+    "@assemblyscript/wasi-shim": "latest",
+    "@eslint/js": "^10.0.1",
+    "@noble/hashes": "^2.2.0",
+    "eslint": "^10.4.1",
+    "prettier": "3.8.3",
+    "typescript-eslint": "^8.60.1",
+    "@types/node": "latest",
+    "as-heap-analyzer": "latest",
+    "as-test": "latest",
+    "assemblyscript": "latest",
+    "chart.js": "latest",
+    "chartjs-node-canvas": "latest",
+    "chartjs-plugin-datalabels": "latest"
+  }
+}

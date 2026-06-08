@@ -1,0 +1,19 @@
+# Generated output
+build/
+charts/
+.as-test/
+node_modules/
+
+# Untracked reference clones
+dragonbox/
+ryu-js/
+zmij/
+
+# Hand-aligned hash kernels and tables: multi-statement round lines and the
+# message-schedule/IV tables are formatted on purpose; Prettier would mangle them.
+assembly/blake3/compress.ts
+assembly/blake3/compress_simd.ts
+assembly/blake3/constants.ts
+
+# Markdown
+*.md
