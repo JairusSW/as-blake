@@ -2,16 +2,19 @@
 // Runtime is selected by the BENCH_CHART_RUNTIME env var (set by
 // scripts/build-charts.sh from --v8/--wavm/--wazero flags). Default: v8.
 //
+// Chart design ported from json-as/scripts/lib/bench-utils.ts.
+//
 // Each chart .mjs file:
-//   1. import { loadResults, createBarChart, generateChart } from "../lib/bench-chart.mjs"
-//   2. assemble a Record<label, BenchResult[]>
-//   3. createBarChart + generateChart("./charts/<name>-<runtime>.png")
+//   1. import { loadBench, createBarChart, generateChart } from "../lib/bench-chart.mjs"
+//   2. assemble a Record<groupLabel, BenchResult[]> + a label map
+//   3. createBarChart + generateChart(withRuntime("./charts/<name>.png"))
 
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import ChartDataLabels from "chartjs-plugin-datalabels";
+import { MODE_BARS, INK } from "./palette.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const LOGS_DIR = path.join(ROOT, "build", "logs", "as");
@@ -60,85 +63,104 @@ export function subtitle() {
   return tokens.join(" • ");
 }
 
-// Palette index - overflow falls back to the gray catch-all.
-const PALETTE = [
-  { fill: "rgba(37, 99, 235, 0.85)", border: "#1d4ed8" }, // blue (baseline)
-  { fill: "rgba(22, 163, 74, 0.85)", border: "#15803d" }, // green (ours)
-  { fill: "rgba(239, 68, 68, 0.85)", border: "#dc2626" }, // red
-  { fill: "rgba(168, 85, 247, 0.85)", border: "#7e22ce" }, // purple
-  { fill: "rgba(234, 179, 8, 0.85)", border: "#ca8a04" }, // amber
-  { fill: "rgba(20, 184, 166, 0.85)", border: "#0d9488" }, // teal
-];
-const GRAY = { fill: "rgba(107, 114, 128, 0.85)", border: "#4b5563" };
-const colorFor = (i) => PALETTE[i] ?? GRAY;
-
 /**
  * Build a grouped-bar chart config.
  *
- * `data` shape: `{ <groupLabel>: { <seriesLabel>: BenchResult } }`
- * The chart groups by group (x-axis) and one bar per series.
+ * `data` shape: `{ <groupLabel>: BenchResult[] }` — one array per x-axis group,
+ * one bar per array entry (series).
+ * `groupLabels` maps a group key to its display label (multi-line allowed).
  *
- * `opts.metric` picks the field to plot - default "mbps". Use "gbps" for
- * GB/s, or any other numeric field on BenchResult.
+ * `opts.metric` picks the field to plot — default "mbps". Use "gbps" for GB/s.
  */
-export function createBarChart(data, opts = {}) {
-  const groups = Object.keys(data);
-  if (groups.length === 0) throw new Error("createBarChart: no groups");
-  const seriesLabels = [
-    ...new Set(groups.flatMap((g) => Object.keys(data[g]))),
-  ];
+export function createBarChart(data, groupLabels = {}, opts = {}) {
+  const groupKeys = Object.keys(data);
+  if (groupKeys.length === 0) throw new Error("createBarChart: no groups");
+  const labels = groupKeys.map((k) => groupLabels[k] ?? k);
   const metric = opts.metric ?? "mbps";
 
-  const datasets = seriesLabels.map((label, i) => {
-    const { fill, border } = colorFor(i);
-    return {
-      label,
-      data: groups.map((g) => data[g][label]?.[metric] ?? 0),
-      backgroundColor: fill,
-      borderColor: border,
-      borderWidth: 1,
-    };
-  });
+  const values = Object.values(data)
+    .flat()
+    .map((r) => r?.[metric] ?? 0);
+  const maxVal = Math.max(...values);
+
+  // Round up to the next step above (tallest bar + half a step), so there is
+  // always headroom for the value label above the highest bar.
+  const yStep = opts.yStep ?? niceStep(maxVal);
+  const yMax = Math.ceil((maxVal + yStep / 2) / yStep) * yStep;
+
+  const datasetNames = opts.datasetLabels ?? [];
+  const palette = opts.colors ?? MODE_BARS;
+  const numDatasets = Math.max(...groupKeys.map((k) => data[k].length));
 
   return {
     type: "bar",
-    data: { labels: groups, datasets },
+    data: {
+      labels,
+      datasets: Array.from({ length: numDatasets }, (_, i) => ({
+        label: datasetNames[i] ?? `Series ${i + 1}`,
+        data: groupKeys.map((k) => data[k][i]?.[metric] ?? 0),
+        backgroundColor: palette[i % palette.length].bg,
+        borderColor: palette[i % palette.length].border,
+        borderWidth: 1,
+      })),
+    },
     options: {
-      responsive: false,
+      responsive: true,
       plugins: {
-        title: opts.title
-          ? {
-              display: true,
-              text: opts.title,
-              font: { size: 20, weight: "bold" },
-            }
-          : { display: false },
+        title: {
+          display: !!opts.title,
+          text: opts.title,
+          font: { size: 20, weight: "bold" },
+        },
+        legend: {
+          position: "top",
+          labels: {
+            font: { size: 16, weight: "bold" },
+            padding: 20,
+          },
+        },
+        datalabels: {
+          anchor: "end",
+          align: opts.labelAlign ?? "end",
+          rotation: opts.labelRotation ?? 0,
+          offset: opts.labelOffset ?? 4,
+          color: INK.label,
+          font: { weight: "bold", size: opts.labelFontSize ?? 12 },
+          formatter: opts.labelFormatter ?? ((v) => v.toFixed(2)),
+        },
         subtitle: {
           display: true,
           text: opts.subtitle ?? subtitle(),
-          color: "#475569",
-          padding: { bottom: 10 },
-        },
-        legend: { position: "top", labels: { font: { size: 13 } } },
-        datalabels: {
-          anchor: "end",
-          align: "end",
-          color: "#111827",
-          font: { size: 11 },
-          formatter:
-            opts.labelFormatter ?? ((v) => Math.round(v).toLocaleString()),
+          font: { size: 14, weight: "bold" },
+          color: INK.subtitle,
+          padding: 16,
+          position: "right",
         },
       },
       scales: {
         y: {
           beginAtZero: true,
-          title: { display: true, text: opts.yLabel ?? metricLabel(metric) },
+          max: yMax,
+          title: {
+            display: true,
+            text: opts.yLabel ?? metricLabel(metric),
+            font: { size: 16, weight: "bold" },
+          },
+          ticks: {
+            stepSize: yStep,
+            font: { size: 14, weight: "bold" },
+          },
         },
         x: {
+          title: {
+            display: !!opts.xLabel,
+            text: opts.xLabel ?? "",
+            font: { size: 16, weight: "bold" },
+          },
           ticks: {
-            font: { size: 11 },
-            maxRotation: opts.xRotation ?? 45,
-            minRotation: opts.xRotation ?? 45,
+            maxRotation: 0,
+            minRotation: 0,
+            font: { size: 14, weight: "bold" },
           },
         },
       },
@@ -147,30 +169,49 @@ export function createBarChart(data, opts = {}) {
   };
 }
 
+/** Pick a round y-axis step that yields ~6-10 ticks for the given max. */
+function niceStep(max) {
+  if (max <= 0) return 1;
+  const raw = max / 8;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return step * mag;
+}
+
 function metricLabel(metric) {
-  if (metric === "mbps") return "MB/s";
-  if (metric === "gbps") return "GB/s";
+  if (metric === "mbps") return "Throughput (MB/s)";
+  if (metric === "gbps") return "Throughput (GB/s)";
   if (metric === "nsPerOp") return "ns/op";
   if (metric === "opsPerSecond") return "ops/s";
   return metric;
 }
 
-/** Render a Chart.js config to PNG. Returns the absolute output path. */
-export function generateChart(
-  config,
-  outPath,
-  { width = 1280, height = 720 } = {},
-) {
+/** Render a Chart.js config to PNG (3x density) or SVG. Returns the output path. */
+export function generateChart(config, outPath) {
+  const abs = path.isAbsolute(outPath) ? outPath : path.join(ROOT, outPath);
+  const isSvg = abs.endsWith(".svg");
+
+  // Render raster (PNG) charts at 3x pixel density: the logical 1000x600 layout
+  // becomes a crisp 3000x1800 image with identical proportions/fonts. SVG is
+  // vector — resolution-independent — so it's left untouched.
+  if (!isSvg) {
+    config.options = { ...(config.options ?? {}), devicePixelRatio: 3 };
+  }
+
   const canvas = new ChartJSNodeCanvas({
-    width,
-    height,
-    backgroundColour: "white",
+    width: 1000,
+    height: 600,
+    type: isSvg ? "svg" : "png",
     chartCallback: (ChartJS) => ChartJS.register(ChartDataLabels),
   });
 
-  const abs = path.isAbsolute(outPath) ? outPath : path.join(ROOT, outPath);
   fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, canvas.renderToBufferSync(config));
+  const buffer = canvas.renderToBufferSync(
+    config,
+    isSvg ? "image/svg+xml" : "image/png",
+  );
+  fs.writeFileSync(abs, buffer);
   console.log("wrote", path.relative(ROOT, abs));
   return abs;
 }

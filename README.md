@@ -112,7 +112,7 @@ Throughput at 1 MiB on an AMD Ryzen 7800X3D:
 The SIMD path uses a degree-4 kernel above 4 KiB and a degree-2 kernel in the 2-4 KiB range. Smaller inputs use the SWAR stream.
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/JairusSW/blake-as/refs/heads/docs/charts/v0.1.0/01-7caf09d/blake3-wavm.png" alt="dtoa (f64) latency vs the AssemblyScript stdlib, by input complexity">
+<img src="https://raw.githubusercontent.com/JairusSW/blake-as/refs/heads/docs/charts/v0.1.0/02-9c50673/blake3-wavm.png" alt="dtoa (f64) latency vs the AssemblyScript stdlib, by input complexity">
 </p>
 
 ## Development

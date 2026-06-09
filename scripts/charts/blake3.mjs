@@ -3,34 +3,39 @@ import {
   createBarChart,
   generateChart,
   withRuntime,
-  subtitle,
 } from "../lib/bench-chart.mjs";
 
-const SIZES = ["64b", "1k", "4k", "64k", "1m"];
+// x-axis groups: payload size → display label (size shown beneath the name).
+const SIZES = {
+  "64b": "64 B",
+  "1k": "1 KB",
+  "4k": "4 KB",
+  "64k": "64 KB",
+  "1m": "1 MB",
+};
 
-const data = {};
-for (const sz of SIZES) {
+const OUTPUT_FILE = withRuntime("./charts/blake3.png");
+
+// One array per size: [SWAR, SIMD]. Sizes with no logs on disk are dropped.
+const chartData = {};
+for (const sz of Object.keys(SIZES)) {
   const swar = loadBench(`blake3-swar-${sz}`);
   const simd = loadBench(`blake3-simd-${sz}`);
   if (!swar && !simd) continue;
-  data[sz] = {};
-  if (swar) data[sz]["swar"] = swar;
-  if (simd) data[sz]["simd"] = simd;
+  chartData[sz] = [swar, simd].filter(Boolean);
 }
 
-if (Object.keys(data).length === 0) {
+if (Object.keys(chartData).length === 0) {
   console.log("No blake3 bench results found - run: npm run bench -- blake3-swar");
   process.exit(0);
 }
 
-generateChart(
-  createBarChart(data, {
-    title: "BLAKE3 throughput: SWAR vs SIMD",
-    subtitle: subtitle(),
-    metric: "gbps",
-    yLabel: "GB/s",
-    labelFormatter: (v) => v.toFixed(2),
-  }),
-  withRuntime("./charts/blake3.png"),
-  { width: 1280, height: 720 },
-);
+const config = createBarChart(chartData, SIZES, {
+  title: "BLAKE3 throughput: SWAR vs SIMD",
+  yLabel: "Throughput (GB/s)",
+  xLabel: "",
+  metric: "gbps",
+  datasetLabels: ["BLAKE3-AS (SWAR)", "BLAKE3-AS (SIMD)"],
+});
+
+generateChart(config, OUTPUT_FILE);
