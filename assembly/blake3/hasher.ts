@@ -28,6 +28,12 @@ const MERGE_TMP: usize = memory.data(32);
 const CTX_KEY: usize = memory.data(32);
 
 export class Hasher {
+  private chunkCVBuf: ArrayBuffer = new ArrayBuffer(32);
+  private blockBuf: ArrayBuffer = new ArrayBuffer(64);
+  private cvStackBuf: ArrayBuffer = new ArrayBuffer(MAX_DEPTH * 32);
+  private parentBuf: ArrayBuffer = new ArrayBuffer(64);
+  private mergeTmpBuf: ArrayBuffer = new ArrayBuffer(32);
+  private ctxKeyBuf: ArrayBuffer = new ArrayBuffer(32);
   private key0: u32 = 0;
   private key1: u32 = 0;
   private key2: u32 = 0;
@@ -44,6 +50,36 @@ export class Hasher {
 
   constructor() {
     this._initKey(IV0, IV1, IV2, IV3, IV4, IV5, IV6, IV7, 0);
+  }
+
+
+  @inline private _chunkCV(): usize {
+    return changetype<usize>(this.chunkCVBuf);
+  }
+
+
+  @inline private _blockBuf(): usize {
+    return changetype<usize>(this.blockBuf);
+  }
+
+
+  @inline private _cvStack(): usize {
+    return changetype<usize>(this.cvStackBuf);
+  }
+
+
+  @inline private _parentBuf(): usize {
+    return changetype<usize>(this.parentBuf);
+  }
+
+
+  @inline private _mergeTmp(): usize {
+    return changetype<usize>(this.mergeTmpBuf);
+  }
+
+
+  @inline private _ctxKey(): usize {
+    return changetype<usize>(this.ctxKeyBuf);
   }
 
   private _initKey(
@@ -70,14 +106,15 @@ export class Hasher {
   }
 
   private _resetChunk(): void {
-    store<u32>(CHUNK_CV, this.key0, 0);
-    store<u32>(CHUNK_CV, this.key1, 4);
-    store<u32>(CHUNK_CV, this.key2, 8);
-    store<u32>(CHUNK_CV, this.key3, 12);
-    store<u32>(CHUNK_CV, this.key4, 16);
-    store<u32>(CHUNK_CV, this.key5, 20);
-    store<u32>(CHUNK_CV, this.key6, 24);
-    store<u32>(CHUNK_CV, this.key7, 28);
+    const chunkCV = this._chunkCV();
+    store<u32>(chunkCV, this.key0, 0);
+    store<u32>(chunkCV, this.key1, 4);
+    store<u32>(chunkCV, this.key2, 8);
+    store<u32>(chunkCV, this.key3, 12);
+    store<u32>(chunkCV, this.key4, 16);
+    store<u32>(chunkCV, this.key5, 20);
+    store<u32>(chunkCV, this.key6, 24);
+    store<u32>(chunkCV, this.key7, 28);
     this.blocksCompressed = 0;
   }
 
@@ -116,17 +153,18 @@ export class Hasher {
     );
     ctxHasher._update(contextPtr, contextLen);
     // @ts-ignore
-    ctxHasher._finalizeRoot(CTX_KEY);
+    ctxHasher._finalizeRoot(ctxHasher._ctxKey());
     const h = new Hasher();
+    const ctxKey = ctxHasher._ctxKey();
     h._initKey(
-      load<u32>(CTX_KEY, 0),
-      load<u32>(CTX_KEY, 4),
-      load<u32>(CTX_KEY, 8),
-      load<u32>(CTX_KEY, 12),
-      load<u32>(CTX_KEY, 16),
-      load<u32>(CTX_KEY, 20),
-      load<u32>(CTX_KEY, 24),
-      load<u32>(CTX_KEY, 28),
+      load<u32>(ctxKey, 0),
+      load<u32>(ctxKey, 4),
+      load<u32>(ctxKey, 8),
+      load<u32>(ctxKey, 12),
+      load<u32>(ctxKey, 16),
+      load<u32>(ctxKey, 20),
+      load<u32>(ctxKey, 24),
+      load<u32>(ctxKey, 28),
       FLAG_DERIVE_KEY_MATERIAL,
     );
     return h;
@@ -141,12 +179,12 @@ export class Hasher {
     while (remaining > 0) {
       const spaceInBuf = <usize>(BLOCK_LEN - this.bufLen);
       if (remaining <= spaceInBuf) {
-        memory.copy(BLOCK_BUF + <usize>this.bufLen, ptr, remaining);
+        memory.copy(this._blockBuf() + <usize>this.bufLen, ptr, remaining);
         this.bufLen += <i32>remaining;
         return;
       }
       if (this.bufLen > 0) {
-        memory.copy(BLOCK_BUF + <usize>this.bufLen, ptr, spaceInBuf);
+        memory.copy(this._blockBuf() + <usize>this.bufLen, ptr, spaceInBuf);
         ptr += spaceInBuf;
         remaining -= spaceInBuf;
         this.bufLen = BLOCK_LEN;
@@ -157,7 +195,7 @@ export class Hasher {
           ptr += BLOCK_LEN;
           remaining -= BLOCK_LEN;
         } else {
-          memory.copy(BLOCK_BUF, ptr, remaining);
+          memory.copy(this._blockBuf(), ptr, remaining);
           this.bufLen = <i32>remaining;
           return;
         }
@@ -167,7 +205,15 @@ export class Hasher {
 
   private _compressBlock(isLast: bool): void {
     const f = this._blockFlags(isLast);
-    compressCV(CHUNK_CV, BLOCK_BUF, this.chunkCounter, BLOCK_LEN, f, CHUNK_CV);
+    const chunkCV = this._chunkCV();
+    compressCV(
+      chunkCV,
+      this._blockBuf(),
+      this.chunkCounter,
+      BLOCK_LEN,
+      f,
+      chunkCV,
+    );
     this.blocksCompressed++;
     this.bufLen = 0;
     if (this.blocksCompressed == 16) {
@@ -177,7 +223,8 @@ export class Hasher {
 
   private _compressBlockDirect(srcPtr: usize, isLast: bool): void {
     const f = this._blockFlags(isLast);
-    compressCV(CHUNK_CV, srcPtr, this.chunkCounter, BLOCK_LEN, f, CHUNK_CV);
+    const chunkCV = this._chunkCV();
+    compressCV(chunkCV, srcPtr, this.chunkCounter, BLOCK_LEN, f, chunkCV);
     this.blocksCompressed++;
     if (this.blocksCompressed == 16) {
       this._finalizeChunk();
@@ -194,8 +241,8 @@ export class Hasher {
   }
 
   private _finalizeChunk(): void {
-    const dst = CV_STACK + <usize>this.cvStackLen * 32;
-    memory.copy(dst, CHUNK_CV, 32);
+    const dst = this._cvStack() + <usize>this.cvStackLen * 32;
+    memory.copy(dst, this._chunkCV(), 32);
     this.cvStackLen++;
     this.chunkCounter++;
     this._mergeSubtrees(this.chunkCounter);
@@ -206,9 +253,9 @@ export class Hasher {
     while ((n & 1) == 0 && this.cvStackLen >= 2) {
       // left and right are adjacent on the stack, so `left` already points at
       // the contiguous left‖right 64-byte parent block.
-      const left = CV_STACK + <usize>(this.cvStackLen - 2) * 32;
+      const left = this._cvStack() + <usize>(this.cvStackLen - 2) * 32;
       this.cvStackLen -= 2;
-      const out = CV_STACK + <usize>this.cvStackLen * 32;
+      const out = this._cvStack() + <usize>this.cvStackLen * 32;
       compressCV(IV_PTR, left, 0, BLOCK_LEN, FLAG_PARENT | this.flags, out);
       this.cvStackLen++;
       n >>= 1;
@@ -222,7 +269,11 @@ export class Hasher {
   private _finalizeRoot(outPtr: usize): void {
     const uBufLen: u32 = <u32>this.bufLen;
     if (uBufLen < BLOCK_LEN) {
-      memory.fill(BLOCK_BUF + <usize>uBufLen, 0, <usize>(BLOCK_LEN - uBufLen));
+      memory.fill(
+        this._blockBuf() + <usize>uBufLen,
+        0,
+        <usize>(BLOCK_LEN - uBufLen),
+      );
     }
     const lastBlockLen: u32 = uBufLen;
 
@@ -234,8 +285,8 @@ export class Hasher {
     if (this.cvStackLen == 0) {
       finalFlags |= FLAG_ROOT;
       compressCV(
-        CHUNK_CV,
-        BLOCK_BUF,
+        this._chunkCV(),
+        this._blockBuf(),
         this.chunkCounter,
         lastBlockLen,
         finalFlags,
@@ -245,29 +296,29 @@ export class Hasher {
     }
 
     compressCV(
-      CHUNK_CV,
-      BLOCK_BUF,
+      this._chunkCV(),
+      this._blockBuf(),
       this.chunkCounter,
       lastBlockLen,
       finalFlags,
-      CHUNK_CV,
+      this._chunkCV(),
     );
 
-    let rightCV = CHUNK_CV;
+    let rightCV = this._chunkCV();
     let stackLen = this.cvStackLen;
 
     while (stackLen > 0) {
-      const leftCV = CV_STACK + <usize>(stackLen - 1) * 32;
-      memory.copy(PARENT_BUF, leftCV, 32);
-      memory.copy(PARENT_BUF + 32, rightCV, 32);
+      const leftCV = this._cvStack() + <usize>(stackLen - 1) * 32;
+      memory.copy(this._parentBuf(), leftCV, 32);
+      memory.copy(this._parentBuf() + 32, rightCV, 32);
       stackLen--;
 
       const mergeFlags =
         FLAG_PARENT | this.flags | (stackLen == 0 ? FLAG_ROOT : 0);
-      const dst: usize = stackLen == 0 ? outPtr : MERGE_TMP;
-      compressCV(IV_PTR, PARENT_BUF, 0, BLOCK_LEN, mergeFlags, dst);
+      const dst: usize = stackLen == 0 ? outPtr : this._mergeTmp();
+      compressCV(IV_PTR, this._parentBuf(), 0, BLOCK_LEN, mergeFlags, dst);
       if (stackLen > 0) {
-        rightCV = MERGE_TMP;
+        rightCV = this._mergeTmp();
       }
     }
   }
@@ -276,7 +327,7 @@ export class Hasher {
     this.cvStackLen = 0;
     this.chunkCounter = 0;
     this.bufLen = 0;
-    memory.fill(BLOCK_BUF, 0, BLOCK_LEN);
+    memory.fill(this._blockBuf(), 0, BLOCK_LEN);
     this._resetChunk();
   }
 }

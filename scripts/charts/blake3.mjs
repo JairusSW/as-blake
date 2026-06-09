@@ -25,7 +25,7 @@ if (Object.keys(data).length === 0) {
 
 generateChart(
   createBarChart(data, {
-    title: "BLAKE3 throughput: SWAR vs SIMD degree-4 (AssemblyScript)",
+    title: "BLAKE3 throughput: SWAR vs SIMD",
     subtitle: subtitle(),
     metric: "gbps",
     yLabel: "GB/s",

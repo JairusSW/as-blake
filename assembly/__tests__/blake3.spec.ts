@@ -1,5 +1,11 @@
 import { describe, it, expect } from "as-test/assembly";
-import { hash, hashUnsafe } from "../blake3/index";
+import {
+  hash,
+  hashUnsafe,
+  hashKeyed,
+  deriveKey,
+  Hasher,
+} from "../blake3/index";
 
 const MAX_INPUT: i32 = 4097;
 const INPUT_BUF: usize = memory.data(4097);
@@ -10,17 +16,31 @@ const INPUT_BUF: usize = memory.data(4097);
 }
 
 const OUT: usize = memory.data(32);
+const OUT_A: usize = memory.data(32);
+const OUT_B: usize = memory.data(32);
+const KEY_BUF: usize = memory.data(32);
+const CTX_BUF: usize = memory.data(32);
+{
+  for (let i = 0; i < 32; i++) {
+    store<u8>(KEY_BUF + <usize>i, <u8>(i + 1));
+    store<u8>(CTX_BUF + <usize>i, <u8>(65 + i));
+  }
+}
 
-function digestHex(): string {
+function digestHexAt(ptr: usize): string {
   let s = "";
   for (let i = 0; i < 32; i++) {
-    const b = load<u8>(OUT + <usize>i);
+    const b = load<u8>(ptr + <usize>i);
     const hi = b >> 4;
     const lo = b & 0xf;
     s += String.fromCharCode(hi < 10 ? 48 + hi : 87 + hi);
     s += String.fromCharCode(lo < 10 ? 48 + lo : 87 + lo);
   }
   return s;
+}
+
+function digestHex(): string {
+  return digestHexAt(OUT);
 }
 
 function hashHex(len: i32): string {
@@ -114,5 +134,46 @@ describe("blake3 hash(ArrayBuffer)", () => {
     const view = Uint8Array.wrap(data);
     for (let i = 0; i < 65; i++) view[i] = <u8>(i % 251);
     expect(toHex(hash(data))).toBe(hashHex(65));
+  });
+});
+
+describe("blake3 streaming", () => {
+  it("matches one-shot across segmented updates", () => {
+    const h = new Hasher();
+    h.update(INPUT_BUF, 17);
+    h.update(INPUT_BUF + 17, 1000);
+    h.update(INPUT_BUF + 1017, 3080);
+    h.finalize(OUT_A);
+    expect(digestHexAt(OUT_A)).toBe(hashHex(4097));
+  });
+
+  it("supports interleaved hasher instances", () => {
+    const a = new Hasher();
+    const b = new Hasher();
+    a.update(INPUT_BUF, 17);
+    b.update(INPUT_BUF, 128);
+    b.finalize(OUT_B);
+    a.update(INPUT_BUF + 17, 48);
+    a.finalize(OUT_A);
+    expect(digestHexAt(OUT_A)).toBe(hashHex(65));
+    expect(digestHexAt(OUT_B)).toBe(hashHex(128));
+  });
+
+  it("matches keyed one-shot hashing", () => {
+    const h = Hasher.createKeyed(KEY_BUF);
+    h.update(INPUT_BUF, 33);
+    h.update(INPUT_BUF + 33, 2015);
+    h.finalize(OUT_A);
+    hashKeyed(KEY_BUF, INPUT_BUF, 2048, OUT_B);
+    expect(digestHexAt(OUT_A)).toBe(digestHexAt(OUT_B));
+  });
+
+  it("matches derive-key one-shot hashing", () => {
+    const h = Hasher.createDeriveKey(CTX_BUF, 32);
+    h.update(INPUT_BUF, 64);
+    h.update(INPUT_BUF + 64, 1985);
+    h.finalize(OUT_A);
+    deriveKey(CTX_BUF, 32, INPUT_BUF, 2049, OUT_B);
+    expect(digestHexAt(OUT_A)).toBe(digestHexAt(OUT_B));
   });
 });
