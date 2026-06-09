@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.1.1] - 2026-06-08
+
+### Changed
+
+- chore: rename to `as-blake` since `blake-as` was too similar to `blake-js`. Frick low-quality npm packages.
+
 ## [0.1.0] - 2026-06-08
 
 First release. Portable, SIMD-accelerated BLAKE3 for AssemblyScript.

@@ -1,10 +1,10 @@
 {
   "name": "as-blake",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Portable, SIMD-accelerated BLAKE3 for AssemblyScript - SWAR and degree-4 SIMD, dispatched at compile time.",
   "type": "module",
   "license": "MIT",
-  "author": "Jairus <me@jairus.dev>",
+  "author": "Jairus Tanaka <me@jairus.dev>",
   "keywords": [
     "blake3",
     "blake",
@@ -13,7 +13,8 @@
     "simd",
     "assemblyscript",
     "webassembly",
-    "wasm"
+    "wasm",
+    "swar"
   ],
   "ascMain": "assembly/index.ts",
   "types": "assembly/index.ts",
