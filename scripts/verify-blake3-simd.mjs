@@ -79,11 +79,11 @@ for (const len of testLens) {
   const expected = blake3(input);
 
   // SWAR (non-SIMD) WASM
-  swar.hash(swarIn, len, swarOut);
+  swar.hashUnsafe(swarIn, len, swarOut);
   const swarResult = new Uint8Array(swar.memory.buffer, swarOut, 32);
 
   // SIMD WASM
-  simd.hash(simdIn, len, simdOut);
+  simd.hashUnsafe(simdIn, len, simdOut);
   const simdResult = new Uint8Array(simd.memory.buffer, simdOut, 32);
 
   const simdMatch = expected.every((b, i) => b === simdResult[i]);

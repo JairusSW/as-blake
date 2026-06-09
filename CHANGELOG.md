@@ -9,8 +9,8 @@ All notable changes to this project are documented here. Format follows
 First release. Portable, SIMD-accelerated BLAKE3 for AssemblyScript.
 
 ### Added
-- BLAKE3 hashing: one-shot `hash`, `hashKeyed`, `deriveKey`, plus a streaming
-  `Hasher` - all pointer-in / pointer-out and allocation-free.
+- BLAKE3 hashing: friendly `hash(ArrayBuffer)`, the allocation-free `hashUnsafe`
+  (raw pointers), plus `hashKeyed`, `deriveKey`, and a streaming `Hasher`.
 - Two compression paths - **SWAR** (8×u64 message loads) and **SIMD** (degree-4 above 4 KiB plus a degree-2 kernel for the 2–4 KiB band, via 128-bit Wasm SIMD).
 - `hash` dispatches to SIMD or SWAR **at compile time** from the
   `ASC_FEATURE_SIMD` flag; a no-SIMD build dead-code-eliminates the v128 kernel

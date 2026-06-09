@@ -1,5 +1,5 @@
 import { describe, it, expect } from "as-test/assembly";
-import { hash } from "../blake3/index";
+import { hash, hashUnsafe } from "../blake3/index";
 
 const MAX_INPUT: i32 = 4097;
 const INPUT_BUF: usize = memory.data(4097);
@@ -24,8 +24,21 @@ function digestHex(): string {
 }
 
 function hashHex(len: i32): string {
-  hash(INPUT_BUF, <usize>len, OUT);
+  hashUnsafe(INPUT_BUF, <usize>len, OUT);
   return digestHex();
+}
+
+function toHex(buf: ArrayBuffer): string {
+  const bytes = Uint8Array.wrap(buf);
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    const hi = b >> 4;
+    const lo = b & 0xf;
+    s += String.fromCharCode(hi < 10 ? 48 + hi : 87 + hi);
+    s += String.fromCharCode(lo < 10 ? 48 + lo : 87 + lo);
+  }
+  return s;
 }
 
 describe("blake3 hash", () => {
@@ -89,4 +102,17 @@ describe("blake3 hash", () => {
     expect(hashHex(4096)).toBe(
       "015094013f57a5277b59d8475c0501042c0b642e531b0a1c8f58d2163229e969",
     ));
+});
+
+describe("blake3 hash(ArrayBuffer)", () => {
+  it("empty", () =>
+    expect(toHex(hash(new ArrayBuffer(0)))).toBe(
+      "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+    ));
+  it("matches the raw path", () => {
+    const data = new ArrayBuffer(65);
+    const view = Uint8Array.wrap(data);
+    for (let i = 0; i < 65; i++) view[i] = <u8>(i % 251);
+    expect(toHex(hash(data))).toBe(hashHex(65));
+  });
 });

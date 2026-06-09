@@ -1,5 +1,5 @@
 import { bench, dumpToFile, blackbox } from "./lib/bench";
-import { hash } from "../blake3/index_simd";
+import { hashUnsafe as hash } from "../blake3/index_simd";
 
 const INPUT_1M: usize = memory.data(1024 * 1024);
 const OUT: usize = memory.data(32);

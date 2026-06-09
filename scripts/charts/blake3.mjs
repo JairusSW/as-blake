@@ -19,7 +19,7 @@ for (const sz of SIZES) {
 }
 
 if (Object.keys(data).length === 0) {
-  console.log("No blake3 bench results found — run: npm run bench -- blake3-swar");
+  console.log("No blake3 bench results found - run: npm run bench -- blake3-swar");
   process.exit(0);
 }
 

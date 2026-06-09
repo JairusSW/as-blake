@@ -1,6 +1,5 @@
 {
   "name": "blake-as",
-  "private": true,
   "version": "0.1.0",
   "description": "Portable, SIMD-accelerated BLAKE3 for AssemblyScript - SWAR and degree-4 SIMD, dispatched at compile time.",
   "type": "module",
@@ -15,6 +14,16 @@
     "assemblyscript",
     "webassembly",
     "wasm"
+  ],
+  "ascMain": "assembly/index.ts",
+  "types": "assembly/index.ts",
+  "files": [
+    "index.ts",
+    "assembly/index.ts",
+    "assembly/blake3/",
+    "assembly/tsconfig.json",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "test": "ast test",

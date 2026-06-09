@@ -51,7 +51,7 @@ for (const len of testLens) {
   for (let i = 0; i < len; i++) input[i] = i % 251;
   const expected = blake3(input);
 
-  exports.hash(IN_PTR, len, OUT_PTR);
+  exports.hashUnsafe(IN_PTR, len, OUT_PTR);
   const got = new Uint8Array(buf, OUT_PTR, 32);
 
   const match = expected.every((b, i) => b === got[i]);

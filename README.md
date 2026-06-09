@@ -55,16 +55,9 @@ Every digest is byte-for-byte correct against the official BLAKE3 test vectors a
 
 ## Installation
 
-Not on npm yet - clone the repo and either copy `assembly/blake3/` into your project, or add a path alias to your `asconfig.json`:
-
-```jsonc
-{
-  "options": {
-    "paths": {
-      "blake-as/*": ["./path/to/this/repo/assembly/blake3/*"]
-    }
-  }
-}
+Install from [NPM](https://www.npmjs.com/package/blake-as):
+```bash
+npm install blake-as
 ```
 
 The single `hash` entry point dispatches at compile time, so the SIMD flag is the only knob. SIMD on (the fast path):
@@ -73,41 +66,35 @@ The single `hash` entry point dispatches at compile time, so the SIMD flag is th
 --enable simd --enable bulk-memory
 ```
 
-…or build SIMD off and the same source folds to a SWAR-only binary (the degree-4 kernel is dead-code-eliminated - ~10 KB, zero `v128` opcodes):
+...or build SIMD off and the same source folds to a SWAR-only binary (the SIMD kernel is dead-code-eliminated - ~10 KB, zero `v128` opcodes):
 
 ```bash
 --enable bulk-memory
 ```
 
-If you run a post-`asc` `wasm-opt` pass on a SIMD build, it needs `--enable-simd` too - Binaryen validates SIMD separately.
-
 ## Usage
 
 ```ts
-import { hash, hashKeyed, deriveKey } from "./blake3";
+import { hash, hashUnsafe } from "./blake3";
 
-// One entry point. `hash` picks its kernel at COMPILE TIME from the SIMD flag:
-//   built WITH  --enable simd → degree-4 SIMD (SWAR stream below 4 chunks)
-//   built WITHOUT simd        → SWAR stream (zero v128 opcodes in the binary)
-hash(inPtr, len, outPtr);   // 32-byte digest at outPtr, zero allocation
+// Friendly: pass an ArrayBuffer, get a new 32-byte digest back.
+const digest = hash(data);
+
+// Hot path: raw pointers in/out, allocation-free - point them at reused buffers.
+hashUnsafe(inPtr, len, outPtr);
 ```
-
-You never pick a kernel by hand - the same source builds both ways. All entry points are pointer-in / pointer-out and **allocation-free** - no `Hasher` object is created per call, so a hot loop is GC-free.
 
 ## API
 
 ### One-shot hashing
 
 ```ts
-// assembly/blake3/index.ts - one dispatching entry + direct kernels.
-hash(inPtr: usize, inLen: usize, outPtr: usize): void       // DISPATCHES: SIMD if --enable simd, else SWAR
-hashSWAR(inPtr: usize, inLen: usize, outPtr: usize): void   // force SWAR     - 8×u64 message loads
-
-// Compile-time flag, if you want to branch yourself:
-const SIMD_ENABLED: bool  // = isDefined(ASC_FEATURE_SIMD) && ASC_FEATURE_SIMD != 0
+// assembly/blake3/index.ts
+hash(data: ArrayBuffer): ArrayBuffer                          // friendly: allocates the digest
+hashUnsafe(inPtr: usize, inLen: usize, outPtr: usize): void // raw, allocation-free
 ```
 
-`outPtr` must point at 32 writable bytes. `hash` is the one you want - it dispatches to the degree-4 SIMD kernel when the build enables SIMD (using it once the input is ≥4 complete chunks, SWAR below that) and to the plain SWAR stream otherwise. `hashSWAR` forces the non-SIMD stream regardless of the build.
+`hash` is the friendly entry - pass an `ArrayBuffer`, get a 32-byte digest. `hashUnsafe` is the zero-allocation hot path: point `outPtr` at 32 writable bytes and reuse it across a loop. Both dispatch to the SIMD kernel when the build enables SIMD (degree-4 above 4 KiB, degree-2 in the 2–4 KiB band) and to the SWAR stream otherwise; `hashSWAR` forces the non-SIMD stream regardless of the build.
 
 ### Keyed hashing & key derivation
 
@@ -147,7 +134,7 @@ The one-shot functions above are scratch-backed (module-global state + `memory.d
 
 ### Benchmarks
 
-Throughput in MB/s, Apple Silicon, swept across message sizes. `SWAR` is single-stream; `SIMD` engages the degree-4 kernel above 4 KiB and a degree-2 kernel in the 2–4 KiB band, falling back to the SWAR stream below ~2 KiB.
+Throughput in MB/s, AMD Ryzen 7800x3D, swept across message sizes. `SWAR` is single-stream; `SIMD` engages the degree-4 kernel above 4 KiB and a degree-2 kernel in the 2–4 KiB band, falling back to the SWAR stream below ~2 KiB.
 
 | variant | V8 (JIT) | WAVM (LLVM AOT) | wazero (Go) |
 |---|---:|---:|---:|
@@ -225,7 +212,7 @@ scripts/
 
 BLAKE3 splits input into 1 KiB chunks; each chunk is `CV = compress_chain(key, 16 blocks)` and is **independent of every other chunk**. The degree-4 kernel (`compress4Chunks`) loads four chunks into the four 32-bit lanes of each `v128`, holds the 16-word state as 16 `v128` rows in **structure-of-arrays** layout (row *i* = word *i* of all four chunks), and runs all 7 rounds once - producing four chunk CVs per call. The four CVs are then folded into the Merkle tree by the hasher. Because the parallelism comes from the *tree*, not from a batch of inputs, this accelerates a single large hash - the thing multi-buffer SHA-256 can't do.
 
-Getting four chunks' message words into SoA needs a 4×4 `i32` transpose per block (eight `v128.shuffle`s per 4-word tile); the hasher's `update()` takes the SIMD path while it's at a chunk boundary with **>4 chunks** remaining, so the final chunk is always left for `finalize()` to tag with the `ROOT` flag. Once fewer than four chunks remain, a **degree-2** kernel (`compress2Chunks`) handles two at a time — it reuses the same body with chunks 0/1 duplicated into the two spare lanes — so the 2–4 KiB band gets a partial SIMD win instead of dropping straight to SWAR.
+Getting four chunks' message words into SoA needs a 4×4 `i32` transpose per block (eight `v128.shuffle`s per 4-word tile); the hasher's `update()` takes the SIMD path while it's at a chunk boundary with **>4 chunks** remaining, so the final chunk is always left for `finalize()` to tag with the `ROOT` flag. Once fewer than four chunks remain, a **degree-2** kernel (`compress2Chunks`) handles two at a time - it reuses the same body with chunks 0/1 duplicated into the two spare lanes - so the 2–4 KiB band gets a partial SIMD win instead of dropping straight to SWAR.
 
 ### The rotation tax
 
