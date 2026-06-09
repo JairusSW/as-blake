@@ -1,5 +1,5 @@
 {
-  "name": "blake-as",
+  "name": "as-blake",
   "version": "0.1.0",
   "description": "Portable, SIMD-accelerated BLAKE3 for AssemblyScript - SWAR and degree-4 SIMD, dispatched at compile time.",
   "type": "module",

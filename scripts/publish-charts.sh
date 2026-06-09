@@ -111,8 +111,8 @@ cp -R "$TMP_CHARTS_DIR/." "$TMP_DOCS_DIR/charts/${DEST}/"
     echo "No chart changes to publish for ${DEST}."
     exit 0
   fi
-  git config user.name "${GIT_AUTHOR_NAME:-$(git config --get user.name || echo blake-as)}"
-  git config user.email "${GIT_AUTHOR_EMAIL:-$(git config --get user.email || echo blake-as@example.com)}"
+  git config user.name "${GIT_AUTHOR_NAME:-$(git config --get user.name || echo as-blake)}"
+  git config user.email "${GIT_AUTHOR_EMAIL:-$(git config --get user.email || echo as-blake@example.com)}"
   git commit -m "Update benchmark charts for ${DEST} [skip ci]" >/dev/null
   git push "$REMOTE_NAME" "$DOCS_BRANCH"
 )
@@ -123,4 +123,4 @@ echo "Pinning README chart URLs to ${DEST}..."
 sed -i -E "s#(/docs/charts/)[^\"']*/([^/\"']+\.png)#\1${DEST}/\2#g" README.md
 
 echo "Charts published to ${REMOTE_NAME}/${DOCS_BRANCH}:charts/${DEST}/ (old folders pruned)"
-echo "README pinned to https://raw.githubusercontent.com/JairusSW/blake-as/refs/heads/docs/charts/${DEST}/"
+echo "README pinned to https://raw.githubusercontent.com/JairusSW/as-blake/refs/heads/docs/charts/${DEST}/"

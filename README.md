@@ -4,7 +4,7 @@
 
 Portable BLAKE3 for AssemblyScript, with a 128-bit Wasm SIMD fast path for large inputs and a compact SWAR fallback for non-SIMD builds.
 
-`blake-as` exposes BLAKE-family one-shot hashing, raw pointer hashing, keyed hashing, key derivation, and incremental streaming. When compiled with `--enable simd`, large messages use degree-4 SIMD: four BLAKE3 chunks are compressed in parallel inside one `v128`.
+`as-blake` exposes BLAKE-family one-shot hashing, raw pointer hashing, keyed hashing, key derivation, and incremental streaming. When compiled with `--enable simd`, large messages use degree-4 SIMD: four BLAKE3 chunks are compressed in parallel inside one `v128`.
 
 <details>
 <summary>Table of Contents</summary>
@@ -22,7 +22,7 @@ Portable BLAKE3 for AssemblyScript, with a 128-bit Wasm SIMD fast path for large
 ## Install
 
 ```bash
-npm install blake-as
+npm install as-blake
 ```
 
 Compile with SIMD for the fast path:
@@ -42,7 +42,7 @@ The package `asconfig.json` enables SIMD and bulk memory by default.
 ## Usage
 
 ```ts
-import { blake3 } from "blake-as";
+import { blake3 } from "as-blake";
 
 const digest = blake3.hash(data); // ArrayBuffer -> 32-byte ArrayBuffer
 ```
@@ -50,7 +50,7 @@ const digest = blake3.hash(data); // ArrayBuffer -> 32-byte ArrayBuffer
 For hot paths, write into a caller-owned output buffer:
 
 ```ts
-import { blake3 } from "blake-as";
+import { blake3 } from "as-blake";
 
 blake3.hashUnsafe(inPtr, inLen, outPtr); // writes 32 bytes at outPtr
 ```
@@ -58,7 +58,7 @@ blake3.hashUnsafe(inPtr, inLen, outPtr); // writes 32 bytes at outPtr
 Incremental hashing uses `Hasher`:
 
 ```ts
-import { blake3 } from "blake-as";
+import { blake3 } from "as-blake";
 
 const h = new blake3.Hasher();
 h.update(ptr0, len0);
@@ -112,7 +112,7 @@ Throughput at 1 MiB on an AMD Ryzen 7800X3D:
 The SIMD path uses a degree-4 kernel above 4 KiB and a degree-2 kernel in the 2-4 KiB range. Smaller inputs use the SWAR stream.
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/JairusSW/blake-as/refs/heads/docs/charts/v0.1.0/02-9c50673/blake3-wavm.png" alt="dtoa (f64) latency vs the AssemblyScript stdlib, by input complexity">
+<img src="https://raw.githubusercontent.com/JairusSW/as-blake/refs/heads/docs/charts/v0.1.0/03-0622499/blake3-wavm.png" alt="dtoa (f64) latency vs the AssemblyScript stdlib, by input complexity">
 </p>
 
 ## Development

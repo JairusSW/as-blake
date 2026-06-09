@@ -23,4 +23,4 @@ First release. Portable, SIMD-accelerated BLAKE3 for AssemblyScript.
 - Correctness: official BLAKE3 test vectors in-wasm, plus cross-validation of
   the SWAR and SIMD paths against `@noble/hashes`.
 
-[0.1.0]: https://github.com/JairusSW/blake-as/releases/tag/v0.1.0
+[0.1.0]: https://github.com/JairusSW/as-blake/releases/tag/v0.1.0
