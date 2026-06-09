@@ -1,6 +1,6 @@
-<h1 align="center"><pre>╔╗ ╦  ╔═╗ ╗╔╗╔═╗  ╔═╗╔═╗
-╠╩╗║  ╠═╣ ╠╣ ╠═ ══╠═╣╚═╗
-╚═╝╚═╝╩ ╩ ╝╚╝╚═╝  ╩ ╩╚═╝</pre></h1>
+<h1 align="center"><pre>╔═╗╔═╗  ╔╗ ╦  ╔═╗ ╗╔╗╔═╗
+╠═╣╚═╗══╠╩╗║  ╠═╣ ╠╣ ╠═ 
+╩ ╩╚═╝  ╚═╝╚═╝╩ ╩ ╝╚╝╚═╝</pre></h1>
 
 Portable BLAKE3 for AssemblyScript, with a 128-bit Wasm SIMD fast path for large inputs and a compact SWAR fallback for non-SIMD builds.
 
